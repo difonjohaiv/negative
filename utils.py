@@ -1,18 +1,21 @@
 import numpy as np
 import sys
-sys.modules['numpy'].object = object
-import numpy as np
+
 import tensorflow as tf
-from sklearn.cluster import Birch,KMeans
+from sklearn.cluster import Birch, KMeans
 from sklearnex import patch_sklearn
 from Augment import resample_random
 from module import contrastive_loss
 
+sys.modules['numpy'].object = object
+import numpy as np
+
+
 def get_data(data_name):
-    if data_name=='ucihar':
+    if data_name == 'ucihar':
         x_data = np.load('datasets/UCI_X.npy')
         y_data = np.load('datasets/UCI_Y.npy')
-    elif data_name=='motion':
+    elif data_name == 'motion':
         x_data = np.load('datasets/Motion_X.npy')
         y_data = np.load('datasets/Motion_Y.npy')
     elif data_name == 'uschad':
@@ -24,20 +27,22 @@ def get_data(data_name):
     np.random.shuffle(x_data)
     np.random.seed(888)
     np.random.shuffle(y_data)
-    return x_data,y_data
+    return x_data, y_data
 
-def get_cluster(cluster_name,cluster_num):
+
+def get_cluster(cluster_name, cluster_num):
     if cluster_name == 'birch':
         cluster = Birch(threshold=0.1, n_clusters=cluster_num)
     elif cluster_name == 'kmeans':
         cluster = KMeans(n_clusters=cluster_num)
     return cluster
 
-def train_step(xis, xjs, model, optimizer,cluster,args):
+
+def train_step(xis, xjs, model, optimizer, cluster, args):
     with tf.GradientTape() as tape:
         zis = model(xis)  # 学习到的增强样本嵌入
         zjs = model(xjs)  # 学习到的样本嵌入
-        loss = contrastive_loss(zis,zjs,cluster,args)
+        loss = contrastive_loss(zis, zjs, cluster, args)
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     return tf.reduce_mean(loss)
