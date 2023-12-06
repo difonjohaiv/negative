@@ -1,4 +1,7 @@
 import numpy as np
+import sys
+sys.modules['numpy'].object = object
+import numpy as np
 import tensorflow as tf
 from sklearn.cluster import Birch,KMeans
 from sklearnex import patch_sklearn
@@ -32,32 +35,38 @@ def get_cluster(cluster_name,cluster_num):
 
 def train_step(xis, xjs, model, optimizer,cluster,args):
     with tf.GradientTape() as tape:
-        zis = model(xis)
-        zjs = model(xjs)
+        zis = model(xis)  # 学习到的增强样本嵌入
+        zjs = model(xjs)  # 学习到的样本嵌入
         loss = contrastive_loss(zis,zjs,cluster,args)
     gradients = tape.gradient(loss, model.trainable_variables)
     optimizer.apply_gradients(zip(gradients, model.trainable_variables))
     return tf.reduce_mean(loss)
 
-def train(model,x_data,args):
+
+def train(model, x_data, args):
     optimizer = tf.keras.optimizers.Adam(args.lr)
     epochs = args.epoch
     batch_size = args.batch_size
 
     patch_sklearn()
-    cluster = get_cluster(args.cluster,args.cluster_num)
+    cluster = get_cluster(args.cluster, args.cluster_num)
 
     cur_loss = 1e9
     seed = len(x_data)
     for epoch in range(epochs):
         loss_epoch = []
-        train_loss_dataset = tf.data.Dataset.from_tensor_slices(x_data).shuffle(seed,reshuffle_each_iteration=True).batch(batch_size)
+        train_loss_dataset = tf.data.Dataset.from_tensor_slices(
+            x_data).shuffle(seed,
+                            reshuffle_each_iteration=True).batch(batch_size)
         for x in train_loss_dataset:
-            xis = resample_random(x)
+            xis = resample_random(x)  # 数据增强
             xjs = x
-            loss = train_step(xis, xjs, model, optimizer,cluster,args)
+            loss = train_step(xis, xjs, model, optimizer, cluster, args)
             loss_epoch.append(loss)
         print("epoch{}===>loss:{}".format(epoch + 1, np.mean(loss_epoch)))
-        if epoch > epochs//2 and np.mean(loss_epoch) < cur_loss:
-            tf.keras.models.save_model(model,'contrastive_model/'+'{}_cluster_{}_batchsize_{}_epoch_{}'.format(args.dataset,args.cluster,args.batch_size,args.epoch))
+        if epoch > epochs // 2 and np.mean(loss_epoch) < cur_loss:
+            tf.keras.models.save_model(
+                model, 'contrastive_model/' +
+                '{}_cluster_{}_batchsize_{}_epoch_{}'.format(
+                    args.dataset, args.cluster, args.batch_size, args.epoch))
             cur_loss = np.mean(loss_epoch)
