@@ -12,20 +12,22 @@ def contrastive_loss(p1_v, p2_v, cluster, args):
     batch_size = len(p1)
     LARGE_NUM = 1e9
 
-    logits_ab = tf.matmul(p1, p2, transpose_b=True) / args.tem
-
+    # 以p1为基准，计算出p1和p1内的对比损失，再计算p1和p2内的对比损失
+    logits_ab = tf.matmul(p1, p2, transpose_b=True) / args.tem  # 1和2之间的点积，就是对比分数
     # logints_aa
     pre_class = cluster.fit_predict(p1.numpy())
     masks_aa = tf.convert_to_tensor([i == pre_class for i in pre_class])
 
     masks_aa = tf.stop_gradient(tf.cast(masks_aa, tf.float32))
-    logits_aa = tf.matmul(p1, p1, transpose_b=True) / args.tem
-    logits_aa = logits_aa - masks_aa * LARGE_NUM
+    logits_aa = tf.matmul(p1, p1, transpose_b=True) / args.tem  # 1和1之间的点积
+    logits_aa = logits_aa - masks_aa * LARGE_NUM  # p1 内部的负损失。同类内部被设置为无限大负数，负损失被保留
 
     masks_ab = masks_aa - tf.one_hot(tf.range(batch_size), batch_size)
-    logits_ab = logits_ab - masks_ab * LARGE_NUM
-    logits_ba = tf.matmul(p2, p1, transpose_b=True) / args.tem
+    logits_ab = logits_ab - masks_ab * LARGE_NUM  # 1为基准，1和2之间的负损失。减去了对角线为1的矩阵，保留了对角线的损失（ie正损失）
 
+
+    # 以p2为基准，计算出p2和p2内的对比损失，再计算p2和p1内的对比损失
+    logits_ba = tf.matmul(p2, p1, transpose_b=True) / args.tem
     # logits_bb
     pre_class = cluster.fit_predict(p2.numpy())
     masks_bb = tf.convert_to_tensor([i == pre_class for i in pre_class])
